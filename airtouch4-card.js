@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.5
+/*! AirTouch 4 Card v1.0.6
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.5";
+  const VERSION = "1.0.6";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -26,6 +26,10 @@
       "M12,11A1,1 0 0,0 11,12A1,1 0 0,0 12,13A1,1 0 0,0 13,12A1,1 0 0,0 12,11M12.5,2C17,2 17.11,5.57 14.75,6.75C13.76,7.24 13.32,8.29 13.13,9.22C13.61,9.42 14.03,9.73 14.35,10.13C18.05,8.13 22.03,8.92 22.03,12.5C22.03,17 18.46,17.1 17.28,14.73C16.78,13.74 15.72,13.3 14.79,13.11C14.59,13.59 14.28,14 13.88,14.34C15.87,18.03 15.08,22 11.5,22C7,22 6.91,18.42 9.27,17.24C10.25,16.75 10.69,15.71 10.89,14.79C10.4,14.59 9.97,14.27 9.65,13.87C5.96,15.85 2,15.07 2,11.5C2,7 5.56,6.89 6.74,9.26C7.24,10.25 8.29,10.68 9.22,10.87C9.41,10.39 9.73,9.97 10.14,9.65C8.15,5.96 8.94,2 12.5,2Z",
     auto:
       "M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,13.57 4.46,15.03 5.24,16.26L6.7,14.8C6.25,13.97 6,13 6,12A6,6 0 0,1 12,6M18.76,7.74L17.3,9.2C17.74,10.04 18,11 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,10.43 19.54,8.97 18.76,7.74Z",
+    heat_cool:
+      "M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,13.57 4.46,15.03 5.24,16.26L6.7,14.8C6.25,13.97 6,13 6,12A6,6 0 0,1 12,6M18.76,7.74L17.3,9.2C17.74,10.04 18,11 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,10.43 19.54,8.97 18.76,7.74Z",
+    spill:
+      "M14,4L16.29,6.29L13.41,9.17L14.83,10.59L17.71,7.71L20,10V4M10,4H4V10L6.29,7.71L11,12.41V20H13V11.59L7.71,6.29L10,4Z",
     off:
       "M16.56,5.44L15.11,6.89C16.84,7.94 18,9.83 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12C6,9.83 7.16,7.94 8.88,6.88L7.44,5.44C5.36,6.88 4,9.28 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12C20,9.28 18.64,6.88 16.56,5.44M13,3H11V13H13V3Z",
     zone_on:
@@ -183,10 +187,14 @@
       const damperIds = this._config.zones
         .map((z) => this._damperEntity(z))
         .filter(Boolean);
+      const spillIds = this._config.zones
+        .map((z) => this._spillEntity(z))
+        .filter(Boolean);
       const key = [
         this._config.entity,
         ...this._config.zones.map((z) => z.entity),
         ...damperIds,
+        ...spillIds,
       ]
         .map((id) => {
           const st = hass.states[id];
@@ -209,6 +217,14 @@
       if (zone.damper_entity) return zone.damper_entity;
       const obj = zone.entity.split(".")[1];
       const guess = `cover.${obj}_damper`;
+      return this._hass && this._hass.states[guess] ? guess : null;
+    }
+
+    _spillEntity(zone) {
+      // hass-airtouch exposes a spill binary sensor per zone.
+      if (zone.spill_entity) return zone.spill_entity;
+      const obj = zone.entity.split(".")[1];
+      const guess = `binary_sensor.${obj}_spill`;
       return this._hass && this._hass.states[guess] ? guess : null;
     }
 
@@ -293,12 +309,15 @@
           const zName = zone.name || st.attributes.friendly_name || zone.entity;
           const setpoint = fmt(st.attributes.temperature, 0);
           const current = fmt(st.attributes.current_temperature, 1);
+          const spillId = this._spillEntity(zone);
+          const spilling = spillId && hass.states[spillId]?.state === "on";
           return `
           <div class="zone ${zOn ? "on" : ""}">
             <button class="zpower" data-i="${i}" title="${zOn ? "Deselect" : "Select"} ${zName}">
               ${svgIcon(zOn ? ICONS.zone_on : ICONS.zone_off)}
             </button>
             <span class="zname" title="${zName}">${zName}</span>
+            ${spilling ? `<span class="spill" title="Spill active">${svgIcon(ICONS.spill)}</span>` : ""}
             <button class="zbtn zdown" data-i="${i}" title="Decrease">${svgIcon(ICONS.minus)}</button>
             <span class="zset">${setpoint}&deg;</span>
             <button class="zbtn zup" data-i="${i}" title="Increase">${svgIcon(ICONS.plus)}</button>
@@ -370,6 +389,7 @@
         .zone.on .zpower { color: #7CFC98; }
         .zname { flex: 1; font-size: .95em; white-space: nowrap;
           overflow: hidden; text-overflow: ellipsis; }
+        .spill { width: 15px; height: 15px; flex: none; opacity: .5; line-height: 0; }
         .zbtn { width: 22px; height: 22px; flex: none; opacity: .85; }
         .zbtn:hover { opacity: 1; }
         .zset { width: 38px; text-align: center; font-size: 1.05em; font-weight: 500; }
