@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.2
+/*! AirTouch 4 Card v1.0.3
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.2";
+  const VERSION = "1.0.3";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -28,6 +28,10 @@
       "M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,13.57 4.46,15.03 5.24,16.26L6.7,14.8C6.25,13.97 6,13 6,12A6,6 0 0,1 12,6M18.76,7.74L17.3,9.2C17.74,10.04 18,11 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,10.43 19.54,8.97 18.76,7.74Z",
     off:
       "M16.56,5.44L15.11,6.89C16.84,7.94 18,9.83 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12C6,9.83 7.16,7.94 8.88,6.88L7.44,5.44C5.36,6.88 4,9.28 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12C20,9.28 18.64,6.88 16.56,5.44M13,3H11V13H13V3Z",
+    zone_on:
+      "M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M11,16.5L18,9.5L16.59,8.09L11,13.67L7.91,10.59L6.5,12L11,16.5Z",
+    zone_off:
+      "M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z",
     minus:
       "M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M7,13H17V11H7V13Z",
     plus:
@@ -176,7 +180,14 @@
       this._hass = hass;
       if (!this._config) return;
       // cheap change detection: re-render only when a watched entity changed
-      const key = [this._config.entity, ...this._config.zones.map((z) => z.entity)]
+      const damperIds = this._config.zones
+        .map((z) => this._damperEntity(z))
+        .filter(Boolean);
+      const key = [
+        this._config.entity,
+        ...this._config.zones.map((z) => z.entity),
+        ...damperIds,
+      ]
         .map((id) => {
           const st = hass.states[id];
           return st ? `${id}:${st.state}:${JSON.stringify(st.attributes)}` : `${id}:missing`;
@@ -190,6 +201,26 @@
 
     getCardSize() {
       return 4 + Math.ceil((this._config?.zones?.length || 0) / 2);
+    }
+
+    _damperEntity(zone) {
+      // hass-airtouch exposes a damper cover per zone; it reflects zone
+      // selection even while the AC is off (the zone climate entity doesn't).
+      if (zone.damper_entity) return zone.damper_entity;
+      const obj = zone.entity.split(".")[1];
+      const guess = `cover.${obj}_damper`;
+      return this._hass && this._hass.states[guess] ? guess : null;
+    }
+
+    _zoneOpen(zone, st) {
+      const d = this._damperEntity(zone);
+      if (d) {
+        const ds = this._hass.states[d];
+        if (ds && ds.state !== "unavailable" && ds.state !== "unknown") {
+          return ds.state !== "closed";
+        }
+      }
+      return st.state !== "off";
     }
 
     _callClimate(service, data) {
@@ -238,14 +269,14 @@
           if (!st) {
             return `<div class="zone missing">${zone.entity} not found</div>`;
           }
-          const zOn = st.state !== "off";
+          const zOn = this._zoneOpen(zone, st);
           const zName = zone.name || st.attributes.friendly_name || zone.entity;
           const setpoint = fmt(st.attributes.temperature, 0);
           const current = fmt(st.attributes.current_temperature, 1);
           return `
           <div class="zone ${zOn ? "on" : ""}">
-            <button class="zpower" data-i="${i}" title="Toggle ${zName}">
-              ${svgIcon(ICONS.power)}
+            <button class="zpower" data-i="${i}" title="${zOn ? "Deselect" : "Select"} ${zName}">
+              ${svgIcon(zOn ? ICONS.zone_on : ICONS.zone_off)}
             </button>
             <span class="zname" title="${zName}">${zName}</span>
             <button class="zbtn zdown" data-i="${i}" title="Decrease">${svgIcon(ICONS.minus)}</button>
@@ -257,6 +288,7 @@
         .join("");
 
       const modeChips = (main.attributes.hvac_modes || [])
+        .filter((m) => m !== "off")
         .map(
           (m) => `
           <button class="chip mode ${m === mode ? "active" : ""}" data-mode="${m}" title="${MODE_LABELS[m] || m}">
@@ -326,21 +358,16 @@
         .controls { flex: 1 1 200px; min-width: 190px; display: grid;
           grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
         .ctl { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .disc {
-          width: 64px; height: 64px; border-radius: 50%;
-          padding: 15px; box-sizing: border-box;
-          background: rgba(255,255,255,.14);
-          box-shadow: inset 0 0 0 2px rgba(255,255,255,.25);
-        }
-        .ctl .label { font-size: .85em; opacity: .9; }
-        .chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+        .ctl .label { font-size: .8em; opacity: .8; text-transform: uppercase;
+          letter-spacing: .05em; }
+        .chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
         .chip {
-          width: 28px; height: 28px; border-radius: 50%;
-          padding: 6px; box-sizing: border-box;
+          width: 34px; height: 34px; border-radius: 50%;
+          padding: 8px; box-sizing: border-box;
           background: rgba(0,0,0,.22); color: rgba(255,255,255,.65);
         }
         .chip.fan { padding: 0; }
-        .fanlabel { font-size: .8em; font-weight: 600; line-height: 28px; }
+        .fanlabel { font-size: .85em; font-weight: 600; line-height: 34px; }
         .chip.active { background: rgba(255,255,255,.9); color: ${c2}; }
         .chip:hover:not(.active) { background: rgba(0,0,0,.35); }
       </style>
@@ -355,13 +382,11 @@
             <div class="zones">${zoneRows || `<div class="zone missing">No zones configured</div>`}</div>
             <div class="controls">
               <div class="ctl">
-                <div class="disc">${svgIcon(ICONS[mode] || (mode === "off" ? ICONS.off : ICONS.auto))}</div>
-                <span class="label">${MODE_LABELS[mode] || mode}</span>
+                <span class="label">Mode &middot; ${MODE_LABELS[mode] || mode}</span>
                 <div class="chips">${modeChips}</div>
               </div>
               <div class="ctl">
-                <div class="disc">${svgIcon(ICONS.fan_only)}</div>
-                <span class="label">${FAN_LABELS[fanMode] || fanMode || "--"}</span>
+                <span class="label">Fan &middot; ${FAN_LABELS[fanMode] || fanMode || "--"}</span>
                 <div class="chips">${fanChips}</div>
               </div>
             </div>
