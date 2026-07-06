@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.10
+/*! AirTouch 4 Card v1.0.11
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.10";
+  const VERSION = "1.0.11";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -378,6 +378,19 @@
       const fanMode = main.attributes.fan_mode;
       const title = cfg.name || main.attributes.friendly_name || "AirTouch";
 
+      // Effective AC setpoint, as shown on the native console/app: the
+      // highest setpoint among currently open zones. Falls back to the AC
+      // entity's own target when no zones are open.
+      const openSetpoints = cfg.zones
+        .map((z) => {
+          const zs = hass.states[z.entity];
+          return zs && this._zoneOpen(z, zs) ? zs.attributes.temperature : null;
+        })
+        .filter((t) => t !== null && t !== undefined && !isNaN(t));
+      const acSetpoint = openSetpoints.length
+        ? Math.max(...openSetpoints)
+        : main.attributes.temperature;
+
       const zoneRows = cfg.zones
         .map((zone, i) => {
           const st = hass.states[zone.entity];
@@ -502,7 +515,7 @@
           <div class="head">
             <button class="mainpower" title="${isOn ? "Turn off" : "Turn on"}">${svgIcon(ICONS.power)}</button>
             <span class="title">${title}</span>
-            <span class="bigtemp" title="AC target temperature">${fmt(main.attributes.temperature, 0)}<span class="unit">&deg;C</span></span>
+            <span class="bigtemp" title="AC target temperature">${fmt(acSetpoint, 0)}<span class="unit">&deg;C</span></span>
           </div>
           <div class="body">
             <div class="zones">${zoneRows || `<div class="zone missing">No zones configured</div>`}</div>
