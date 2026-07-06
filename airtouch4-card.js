@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.0
+/*! AirTouch 4 Card v1.0.1
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.0";
+  const VERSION = "1.0.1";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -307,8 +307,8 @@
         .zset { width: 38px; text-align: center; font-size: 1.05em; font-weight: 500; }
         .zcur { width: 46px; text-align: right; font-size: .78em; opacity: .75; }
         /* right column: mode + fan */
-        .controls { flex: 1 1 200px; min-width: 190px; display: flex;
-          gap: 14px; align-items: flex-start; justify-content: space-around; }
+        .controls { flex: 1 1 200px; min-width: 190px; display: grid;
+          grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
         .ctl { display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .disc {
           width: 64px; height: 64px; border-radius: 50%;
@@ -395,9 +395,10 @@
         el.addEventListener("click", () => {
           const zone = cfg.zones[Number(el.dataset.i)];
           const st = this._hass.states[zone.entity];
-          this._callClimate("set_hvac_mode", {
+          // Zone on/off via turn_on/turn_off — the airtouch4 integration's
+          // set_hvac_mode path is unreliable for zones ("AirTouchGroup" error).
+          this._callClimate(st.state === "off" ? "turn_on" : "turn_off", {
             entity_id: zone.entity,
-            hvac_mode: st.state === "off" ? "fan_only" : "off",
           });
         })
       );
