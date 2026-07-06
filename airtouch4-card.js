@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.1
+/*! AirTouch 4 Card v1.0.2
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.1";
+  const VERSION = "1.0.2";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -40,6 +40,7 @@
     dry: ["#3a2f0b", "#b28704"],
     fan_only: ["#0b3538", "#00838f"],
     auto: ["#12303d", "#00695c"],
+    heat_cool: ["#12303d", "#00695c"],
     off: ["#23272b", "#3a4046"],
   };
 
@@ -49,6 +50,7 @@
     dry: "Dry",
     fan_only: "Fan",
     auto: "Auto",
+    heat_cool: "Auto",
     off: "Off",
   };
 
@@ -63,13 +65,27 @@
   /* ------------------------------------------------------------------ *
    *  Zone discovery helpers (shared by card stub + editor)             *
    * ------------------------------------------------------------------ */
-  const isMainAc = (st) =>
-    st && st.entity_id.startsWith("climate.") && Array.isArray(st.attributes.fan_modes);
+  const isMainAc = (st) => {
+    if (!st || !st.entity_id.startsWith("climate.")) return false;
+    // hass-airtouch sets device_class "ac"; core airtouch4 main AC is the
+    // climate entity with a real fan-speed list.
+    if (st.attributes.device_class === "ac") return true;
+    const fm = st.attributes.fan_modes;
+    return Array.isArray(fm) && fm.length > 2;
+  };
 
   const isZone = (st) => {
     if (!st || !st.entity_id.startsWith("climate.")) return false;
-    const m = (st.attributes.hvac_modes || []).slice().sort().join(",");
-    return m === "fan_only,off";
+    // hass-airtouch sets device_class "zone".
+    if (st.attributes.device_class === "zone") return true;
+    if (st.attributes.device_class === "ac") return false;
+    // Core airtouch4 zones expose exactly [off, fan_only]; other AirTouch-like
+    // zones expose "off" plus at most one active mode and no real fan speeds.
+    const modes = (st.attributes.hvac_modes || []).slice().sort();
+    if (modes.join(",") === "fan_only,off") return true;
+    const fm = st.attributes.fan_modes;
+    const zoneFan = !Array.isArray(fm) || fm.length <= 2;
+    return zoneFan && modes.length <= 2 && modes.includes("off");
   };
 
   const discoverZonesHeuristic = (hass, mainEntity) =>
@@ -339,7 +355,7 @@
             <div class="zones">${zoneRows || `<div class="zone missing">No zones configured</div>`}</div>
             <div class="controls">
               <div class="ctl">
-                <div class="disc">${svgIcon(ICONS[mode] || ICONS.off)}</div>
+                <div class="disc">${svgIcon(ICONS[mode] || (mode === "off" ? ICONS.off : ICONS.auto))}</div>
                 <span class="label">${MODE_LABELS[mode] || mode}</span>
                 <div class="chips">${modeChips}</div>
               </div>
@@ -434,7 +450,7 @@
     }
 
     setConfig(config) {
-      this._config = {
+      const next = {
         step: 1,
         show_zone_current: true,
         ...config,
@@ -442,6 +458,16 @@
           typeof z === "string" ? { entity: z } : { ...z }
         ),
       };
+      delete next.type;
+      // When HA echoes back the config we just emitted, don't rebuild the
+      // DOM — rebuilding steals focus from the field being typed in.
+      const cur = this._config ? { ...this._config } : null;
+      if (cur) delete cur.type;
+      if (cur && JSON.stringify(cur) === JSON.stringify(next)) {
+        this._config = next;
+        return;
+      }
+      this._config = next;
       this._render();
       this._maybeAutoDiscover();
     }
