@@ -1,14 +1,14 @@
-/*! AirTouch 4 Card v1.0.12
- *  A Lovelace card for the Home Assistant AirTouch 4 integration.
+/*! AirTouch Card v1.1.0
+ *  A Lovelace card for Polyaire AirTouch 4 and AirTouch 5 systems.
  *  Replicates the classic AirTouch console look: main AC status, mode,
- *  fan speed, and per-zone power / setpoint control.
- *  https://github.com/mycrouch/airtouch4-card
+ *  fan speed, and per-zone selection / setpoint control.
+ *  https://github.com/mycrouch/airtouch-card
  *  MIT License
  */
 (() => {
   "use strict";
 
-  const VERSION = "1.0.12";
+  const VERSION = "1.1.0";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -64,7 +64,16 @@
     off: "Off",
   };
 
-  const FAN_LABELS = { low: "Low", medium: "Medium", high: "High", auto: "Auto" };
+  const FAN_LABELS = {
+    auto: "Auto",
+    quiet: "Quiet",
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    powerful: "Powerful",
+    turbo: "Turbo",
+    intelligent: "Intelligent Auto",
+  };
 
   const svgIcon = (path, cls = "") =>
     `<svg class="${cls}" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
@@ -202,7 +211,7 @@
     }
 
     static getConfigElement() {
-      return document.createElement("airtouch4-card-editor");
+      return document.createElement("airtouch-card-editor");
     }
 
     static getStubConfig(hass) {
@@ -626,6 +635,9 @@
     }
 
     setConfig(config) {
+      // Preserve whichever card type the user's config already uses
+      // (custom:airtouch-card or the legacy custom:airtouch4-card alias).
+      if (config && config.type) this._type = config.type;
       const next = {
         step: 1,
         show_zone_current: true,
@@ -655,7 +667,12 @@
     _emit() {
       this.dispatchEvent(
         new CustomEvent("config-changed", {
-          detail: { config: { type: "custom:airtouch4-card", ...this._config } },
+          detail: {
+            config: {
+              type: this._type || "custom:airtouch-card",
+              ...this._config,
+            },
+          },
           bubbles: true,
           composed: true,
         })
@@ -850,27 +867,37 @@
   }
 
   /* ------------------------------------------------------------------ */
+  if (!customElements.get("airtouch-card")) {
+    customElements.define("airtouch-card", AirTouch4Card);
+  }
+  // Backwards-compatible alias for configs created as custom:airtouch4-card.
   if (!customElements.get("airtouch4-card")) {
-    customElements.define("airtouch4-card", AirTouch4Card);
+    customElements.define("airtouch4-card", class extends AirTouch4Card {});
+  }
+  if (!customElements.get("airtouch-card-editor")) {
+    customElements.define("airtouch-card-editor", AirTouch4CardEditor);
   }
   if (!customElements.get("airtouch4-card-editor")) {
-    customElements.define("airtouch4-card-editor", AirTouch4CardEditor);
+    customElements.define(
+      "airtouch4-card-editor",
+      class extends AirTouch4CardEditor {}
+    );
   }
 
   window.customCards = window.customCards || [];
-  if (!window.customCards.some((c) => c.type === "airtouch4-card")) {
+  if (!window.customCards.some((c) => c.type === "airtouch-card")) {
     window.customCards.push({
-      type: "airtouch4-card",
-      name: "AirTouch 4 Card",
+      type: "airtouch-card",
+      name: "AirTouch Card",
       description:
-        "Control an AirTouch 4 system: main AC power/mode/fan and per-zone power and setpoints, with zone auto-discovery.",
+        "Control a Polyaire AirTouch 4/5 system: main AC power/mode/fan and per-zone selection and setpoints, with zone auto-discovery.",
       preview: true,
-      documentationURL: "https://github.com/mycrouch/airtouch4-card",
+      documentationURL: "https://github.com/mycrouch/airtouch-card",
     });
   }
 
   console.info(
-    `%c AIRTOUCH4-CARD %c v${VERSION} `,
+    `%c AIRTOUCH-CARD %c v${VERSION} `,
     "color:#fff;background:#00838f;font-weight:600;padding:2px 6px;border-radius:4px 0 0 4px",
     "color:#00838f;background:#e0f7fa;font-weight:600;padding:2px 6px;border-radius:0 4px 4px 0"
   );

@@ -1,6 +1,6 @@
-# AirTouch 4 Card
+# AirTouch Card
 
-A Lovelace card for Home Assistant that recreates the Polyaire AirTouch console experience: main AC power, mode and fan control, plus per-zone selection and setpoints — all in one card with a GUI editor and zone auto-discovery.
+A Lovelace card for **AirTouch 4 and AirTouch 5** systems in Home Assistant, recreating the Polyaire AirTouch console experience: main AC power, mode and fan control, plus per-zone selection and setpoints — all in one card with a GUI editor and zone auto-discovery.
 
 <p align="center">
   <img src="images/card-heat.png" width="59%" alt="AirTouch 4 Card — heat mode, wide column">
@@ -26,17 +26,23 @@ Designed as a **companion to the [mycrouch/hass-airtouch](https://github.com/myc
 
 ### HACS
 
-1. HACS → menu (⋮) → **Custom repositories** → add `https://github.com/mycrouch/airtouch4-card`, category **Dashboard**.
-2. Download **AirTouch 4 Card**. The Lovelace resource is registered automatically.
+1. HACS → menu (⋮) → **Custom repositories** → add `https://github.com/mycrouch/airtouch-card`, category **Dashboard**.
+2. Download **AirTouch Card**. The Lovelace resource is registered automatically.
 
 ### Manual
 
-Copy `airtouch4-card.js` to `config/www/` and add a dashboard resource:
+Copy `airtouch-card.js` to `config/www/` and add a dashboard resource:
 
 ```yaml
-url: /local/airtouch4-card.js
+url: /local/airtouch-card.js
 type: module
 ```
+
+## AirTouch 5
+
+The card is integration-driven, so AirTouch 5 systems are supported through the same [hass-airtouch](https://github.com/mycrouch/hass-airtouch) integration — including the extra AT5 fan modes (Quiet, Powerful, Turbo, Intelligent Auto). Developed and tested on AirTouch 4 hardware; AT5 feedback welcome via issues.
+
+The legacy `custom:airtouch4-card` type keeps working as an alias, so existing dashboards are unaffected by the rename.
 
 ## Recommended integration
 
@@ -46,10 +52,10 @@ With the built-in `airtouch4` core integration the card still renders and contro
 
 ## Configuration
 
-Everything is configurable in the GUI editor (Add card → **AirTouch 4 Card**). YAML equivalent:
+Everything is configurable in the GUI editor (Add card → **AirTouch Card**). YAML equivalent:
 
 ```yaml
-type: custom:airtouch4-card
+type: custom:airtouch-card
 entity: climate.daikin           # main AC (device_class: ac)
 name: Daikin AC                  # optional card title
 step: 1                          # optional, zone setpoint step in °C
