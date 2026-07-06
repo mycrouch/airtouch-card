@@ -2,7 +2,10 @@
 
 A Lovelace card for Home Assistant that recreates the Polyaire AirTouch console experience: main AC power, mode and fan control, plus per-zone selection and setpoints — all in one card with a GUI editor and zone auto-discovery.
 
-![AirTouch 4 Card](images/card.png)
+<p align="center">
+  <img src="images/card-heat.png" width="59%" alt="AirTouch 4 Card — heat mode, wide column">
+  <img src="images/card-cool.png" width="35%" alt="AirTouch 4 Card — cool mode, narrow column">
+</p>
 
 Designed as a **companion to the [mycrouch/hass-airtouch](https://github.com/mycrouch/hass-airtouch) integration** (a fork of [TheNoctambulist/hass-airtouch](https://github.com/TheNoctambulist/hass-airtouch) that adds a selectable AirTouch 4/5 direct-connection mode for consoles on a different subnet/VLAN to Home Assistant). The card also works with the upstream integration, and degrades gracefully on the built-in `airtouch4` core integration.
 
@@ -16,6 +19,7 @@ Designed as a **companion to the [mycrouch/hass-airtouch](https://github.com/myc
 - **Mode & fan chips** — one-row selectors. Changing mode uses the integration's `airtouch.set_hvac_mode_only` service where available, so selecting a mode does **not** power the AC on (falls back to `climate.set_hvac_mode` otherwise).
 - **GUI editor with zone auto-discovery** — pick your AC entity and zones are discovered automatically (via the entity registry, `device_class: ac`/`zone`, with heuristic fallbacks). Rename zones in the card without touching the entity registry; add/remove/re-discover at any time.
 - **Robust entity resolution** — damper, spill and battery entities are resolved through the entity registry (zone → device → sibling entities), so renamed entity IDs don't break anything. Per-zone manual overrides are available if you have an exotic setup.
+- **Responsive layout** — the card auto-resizes to its Lovelace column: zone rows and the mode/fan controls reflow side by side in wide columns and stack in narrow ones (see the two screenshots above).
 - **Single file, no assets** — all graphics are inline SVG. No images to install, no external resources.
 
 ## Installation
