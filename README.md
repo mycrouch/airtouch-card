@@ -83,6 +83,15 @@ zones:                           # auto-discovered; override to reorder/rename
 | `zones[].temp_up_service` | — | Custom service for temp up (e.g. `script.x`) |
 | `zones[].temp_down_service` | — | Custom service for temp down |
 
+## Related projects
+
+| Repo | What it is |
+|---|---|
+| [hass-airtouch](https://github.com/mycrouch/hass-airtouch) | Polyaire AirTouch 4/5 integration (fork) with a direct-connection mode for consoles on a different subnet/VLAN |
+| [airtouch-card](https://github.com/mycrouch/airtouch-card) | Lovelace card for AirTouch 4/5 - console-style zone control with GUI editor and auto-discovery |
+| [airtouch-gradient-themes](https://github.com/mycrouch/airtouch-gradient-themes) | 20 gradient dashboard themes matching the card styling |
+| [ecovacs-vacuum-card](https://github.com/mycrouch/ecovacs-vacuum-card) | Ecovacs/Deebot vacuum card with per-card theming (default / installed theme / manual gradient) |
+
 ## License
 
 MIT. Icon paths from [Material Design Icons](https://pictogrammers.com/library/mdi/) (Apache 2.0).
