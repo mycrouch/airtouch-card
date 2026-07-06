@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.11
+/*! AirTouch 4 Card v1.0.12
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.11";
+  const VERSION = "1.0.12";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -410,7 +410,7 @@
             <button class="zpower" data-i="${i}" title="${zOn ? "Deselect" : "Select"} ${zName}">
               ${svgIcon(zOn ? ICONS.zone_on : ICONS.zone_off)}
             </button>
-            <span class="zname" title="${zName}">${zName}</span>
+            <span class="zname" data-i="${i}" role="button" title="${zOn ? "Deselect" : "Select"} ${zName}">${zName}</span>
             ${battLow ? `<span class="batt" title="Sensor battery low">${svgIcon(ICONS.battery_low)}</span>` : ""}
             ${spillId ? `<span class="spill ${spilling ? "active" : ""}" title="${spilling ? "Spill active" : "Spill zone"}"><svg viewBox="0 0 24 24"><path transform="rotate(90 12 12)" d="${ICONS.spill}"/></svg></span>` : ""}
             <button class="zbtn zdown" data-i="${i}" title="Decrease">${svgIcon(ICONS.minus)}</button>
@@ -483,7 +483,8 @@
           color: rgba(255,255,255,.45); }
         .zone.on .zpower { color: #7CFC98; }
         .zname { flex: 1; font-size: .95em; white-space: nowrap;
-          overflow: hidden; text-overflow: ellipsis; }
+          overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+          -webkit-user-select: none; user-select: none; }
         .spill { width: 15px; height: 15px; flex: none; opacity: .3; line-height: 0; }
         .spill.active { opacity: .95; color: #7CFC98; }
         .batt { width: 15px; height: 15px; flex: none; opacity: .95;
@@ -581,7 +582,7 @@
           })
         )
       );
-      root.querySelectorAll(".zpower").forEach((el) =>
+      root.querySelectorAll(".zpower, .zname").forEach((el) =>
         el.addEventListener("click", () => {
           const zone = cfg.zones[Number(el.dataset.i)];
           const st = this._hass.states[zone.entity];
