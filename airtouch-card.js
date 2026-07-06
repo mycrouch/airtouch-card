@@ -1,4 +1,4 @@
-/*! AirTouch Card v1.2.0
+/*! AirTouch Card v1.2.1
  *  A Lovelace card for Polyaire AirTouch 4 and AirTouch 5 systems.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone selection / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.2.0";
+  const VERSION = "1.2.1";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
