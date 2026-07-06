@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.6
+/*! AirTouch 4 Card v1.0.7
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.6";
+  const VERSION = "1.0.7";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -317,7 +317,7 @@
               ${svgIcon(zOn ? ICONS.zone_on : ICONS.zone_off)}
             </button>
             <span class="zname" title="${zName}">${zName}</span>
-            ${spilling ? `<span class="spill" title="Spill active">${svgIcon(ICONS.spill)}</span>` : ""}
+            ${spillId ? `<span class="spill ${spilling ? "active" : ""}" title="${spilling ? "Spill active" : "Spill zone"}">${svgIcon(ICONS.spill)}</span>` : ""}
             <button class="zbtn zdown" data-i="${i}" title="Decrease">${svgIcon(ICONS.minus)}</button>
             <span class="zset">${setpoint}&deg;</span>
             <button class="zbtn zup" data-i="${i}" title="Increase">${svgIcon(ICONS.plus)}</button>
@@ -389,25 +389,27 @@
         .zone.on .zpower { color: #7CFC98; }
         .zname { flex: 1; font-size: .95em; white-space: nowrap;
           overflow: hidden; text-overflow: ellipsis; }
-        .spill { width: 15px; height: 15px; flex: none; opacity: .5; line-height: 0; }
+        .spill { width: 15px; height: 15px; flex: none; opacity: .3; line-height: 0; }
+        .spill.active { opacity: .95; color: #7CFC98; }
         .zbtn { width: 22px; height: 22px; flex: none; opacity: .85; }
         .zbtn:hover { opacity: 1; }
         .zset { width: 38px; text-align: center; font-size: 1.05em; font-weight: 500; }
         .zcur { width: 46px; text-align: right; font-size: .78em; opacity: .75; }
         /* right column: mode + fan */
-        .controls { flex: 1 1 200px; min-width: 190px; display: grid;
-          grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+        .controls { flex: 1 1 200px; min-width: 190px; display: flex;
+          gap: 20px; align-items: flex-start; justify-content: space-around;
+          flex-wrap: wrap; }
         .ctl { display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .ctl .label { font-size: .8em; opacity: .8; text-transform: uppercase;
           letter-spacing: .05em; }
-        .chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .chips { display: flex; gap: 6px; flex-wrap: nowrap; justify-content: center; }
         .chip {
-          width: 34px; height: 34px; border-radius: 50%;
-          padding: 8px; box-sizing: border-box;
+          width: 30px; height: 30px; border-radius: 50%;
+          padding: 7px; box-sizing: border-box; flex: none;
           background: rgba(0,0,0,.22); color: rgba(255,255,255,.65);
         }
         .chip.fan { padding: 0; }
-        .fanlabel { font-size: .85em; font-weight: 600; line-height: 34px; }
+        .fanlabel { font-size: .85em; font-weight: 600; line-height: 30px; }
         .chip.active { background: rgba(255,255,255,.9); color: ${c2}; }
         .chip:hover:not(.active) { background: rgba(0,0,0,.35); }
       </style>
