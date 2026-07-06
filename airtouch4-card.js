@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.8
+/*! AirTouch 4 Card v1.0.9
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.8";
+  const VERSION = "1.0.9";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -29,7 +29,9 @@
     heat_cool:
       "M12,6V9L16,5L12,1V4A8,8 0 0,0 4,12C4,13.57 4.46,15.03 5.24,16.26L6.7,14.8C6.25,13.97 6,13 6,12A6,6 0 0,1 12,6M18.76,7.74L17.3,9.2C17.74,10.04 18,11 18,12A6,6 0 0,1 12,18V15L8,19L12,23V20A8,8 0 0,0 20,12C20,10.43 19.54,8.97 18.76,7.74Z",
     spill:
-      "M14,4L16.29,6.29L13.41,9.17L14.83,10.59L17.71,7.71L20,10V4M10,4H4V10L6.29,7.71L11,12.41V20H13V11.59L7.71,6.29L10,4Z",
+      "M4,10A1,1 0 0,1 3,9A1,1 0 0,1 4,8H12A2,2 0 0,0 14,6A2,2 0 0,0 12,4C11.45,4 10.95,4.22 10.59,4.59C10.2,5 9.56,5 9.17,4.59C8.78,4.2 8.78,3.56 9.17,3.17C9.9,2.45 10.9,2 12,2A4,4 0 0,1 16,6A4,4 0 0,1 12,10H4M19,12A1,1 0 0,0 20,11A1,1 0 0,0 19,10C18.72,10 18.47,10.11 18.29,10.29C17.9,10.68 17.27,10.68 16.88,10.29C16.5,9.9 16.5,9.27 16.88,8.88C17.42,8.34 18.17,8 19,8A3,3 0 0,1 22,11A3,3 0 0,1 19,14H5A1,1 0 0,1 4,13A1,1 0 0,1 5,12H19M18,18H4A1,1 0 0,1 3,17A1,1 0 0,1 4,16H18A3,3 0 0,1 21,19A3,3 0 0,1 18,22C17.17,22 16.42,21.66 15.88,21.12C15.5,20.73 15.5,20.1 15.88,19.71C16.27,19.32 16.9,19.32 17.29,19.71C17.47,19.89 17.72,20 18,20A1,1 0 0,0 19,19A1,1 0 0,0 18,18Z",
+    battery_low:
+      "M13,14H11V9H13M13,18H11V16H13M16.67,4H15V2H9V4H7.33A1.33,1.33 0 0,0 6,5.33V20.67C6,21.4 6.6,22 7.33,22H16.67A1.33,1.33 0 0,0 18,20.67V5.33C18,4.6 17.4,4 16.67,4Z",
     off:
       "M16.56,5.44L15.11,6.89C16.84,7.94 18,9.83 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12C6,9.83 7.16,7.94 8.88,6.88L7.44,5.44C5.36,6.88 4,9.28 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12C20,9.28 18.64,6.88 16.56,5.44M13,3H11V13H13V3Z",
     zone_on:
@@ -180,9 +182,15 @@
               e.entity_id.startsWith("binary_sensor.") &&
               /spill/i.test(named(e))
           );
+          const battery = siblings.find(
+            (e) =>
+              e.entity_id.startsWith("binary_sensor.") &&
+              /batter/i.test(named(e))
+          );
           map[z.entity] = {
             damper: damper ? damper.entity_id : null,
             spill: spill ? spill.entity_id : null,
+            battery: battery ? battery.entity_id : null,
           };
         }
         this._entityMap = map;
@@ -238,11 +246,15 @@
       const spillIds = this._config.zones
         .map((z) => this._spillEntity(z))
         .filter(Boolean);
+      const batteryIds = this._config.zones
+        .map((z) => this._batteryEntity(z))
+        .filter(Boolean);
       const key = [
         this._config.entity,
         ...this._config.zones.map((z) => z.entity),
         ...damperIds,
         ...spillIds,
+        ...batteryIds,
       ]
         .map((id) => {
           const st = hass.states[id];
@@ -280,6 +292,18 @@
       }
       const obj = zone.entity.split(".")[1];
       const guess = `binary_sensor.${obj}_spill`;
+      return this._hass && this._hass.states[guess] ? guess : null;
+    }
+
+    _batteryEntity(zone) {
+      // Zone temperature-sensor low-battery indicator (binary_sensor,
+      // device_class battery: on = low).
+      if (zone.battery_entity) return zone.battery_entity;
+      if (this._entityMap && zone.entity in this._entityMap) {
+        return this._entityMap[zone.entity].battery;
+      }
+      const obj = zone.entity.split(".")[1];
+      const guess = `binary_sensor.${obj}_battery`;
       return this._hass && this._hass.states[guess] ? guess : null;
     }
 
@@ -366,13 +390,16 @@
           const current = fmt(st.attributes.current_temperature, 1);
           const spillId = this._spillEntity(zone);
           const spilling = spillId && hass.states[spillId]?.state === "on";
+          const battId = this._batteryEntity(zone);
+          const battLow = battId && hass.states[battId]?.state === "on";
           return `
           <div class="zone ${zOn ? "on" : ""}">
             <button class="zpower" data-i="${i}" title="${zOn ? "Deselect" : "Select"} ${zName}">
               ${svgIcon(zOn ? ICONS.zone_on : ICONS.zone_off)}
             </button>
             <span class="zname" title="${zName}">${zName}</span>
-            ${spillId ? `<span class="spill ${spilling ? "active" : ""}" title="${spilling ? "Spill active" : "Spill zone"}">${svgIcon(ICONS.spill)}</span>` : ""}
+            ${battLow ? `<span class="batt" title="Sensor battery low">${svgIcon(ICONS.battery_low)}</span>` : ""}
+            ${spillId ? `<span class="spill ${spilling ? "active" : ""}" title="${spilling ? "Spill active" : "Spill zone"}"><svg viewBox="0 0 24 24"><path transform="rotate(90 12 12)" d="${ICONS.spill}"/></svg></span>` : ""}
             <button class="zbtn zdown" data-i="${i}" title="Decrease">${svgIcon(ICONS.minus)}</button>
             <span class="zset">${setpoint}&deg;</span>
             <button class="zbtn zup" data-i="${i}" title="Increase">${svgIcon(ICONS.plus)}</button>
@@ -446,6 +473,8 @@
           overflow: hidden; text-overflow: ellipsis; }
         .spill { width: 15px; height: 15px; flex: none; opacity: .3; line-height: 0; }
         .spill.active { opacity: .95; color: #7CFC98; }
+        .batt { width: 15px; height: 15px; flex: none; opacity: .95;
+          line-height: 0; color: #ffcc66; }
         .zbtn { width: 22px; height: 22px; flex: none; opacity: .85; }
         .zbtn:hover { opacity: 1; }
         .zset { width: 38px; text-align: center; font-size: 1.05em; font-weight: 500; }
