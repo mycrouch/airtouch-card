@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.9
+/*! AirTouch 4 Card v1.0.10
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.9";
+  const VERSION = "1.0.10";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -502,7 +502,7 @@
           <div class="head">
             <button class="mainpower" title="${isOn ? "Turn off" : "Turn on"}">${svgIcon(ICONS.power)}</button>
             <span class="title">${title}</span>
-            <span class="bigtemp">${fmt(main.attributes.current_temperature, 1)}<span class="unit">&deg;C</span></span>
+            <span class="bigtemp" title="AC target temperature">${fmt(main.attributes.temperature, 0)}<span class="unit">&deg;C</span></span>
           </div>
           <div class="body">
             <div class="zones">${zoneRows || `<div class="zone missing">No zones configured</div>`}</div>
