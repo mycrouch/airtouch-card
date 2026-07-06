@@ -7,6 +7,16 @@ A Lovelace card for **AirTouch 4 and AirTouch 5** systems in Home Assistant, rec
   <img src="images/card-cool.png" width="35%" alt="AirTouch 4 Card — cool mode, narrow column">
 </p>
 
+
+### Three styles, selectable in the GUI editor
+
+<p align="center">
+  <img src="images/style-bold.png" width="32%" alt="Bold style - dark mode-tinted gradient">
+  <img src="images/style-light.png" width="32%" alt="Light style - pastel mode-tinted gradient">
+  <img src="images/style-default.png" width="32%" alt="Default style - follows your HA theme">
+</p>
+<p align="center"><sub>Bold &middot; Light &middot; Default (follows your theme)</sub></p>
+
 Designed as a **companion to the [mycrouch/hass-airtouch](https://github.com/mycrouch/hass-airtouch) integration** (a fork of [TheNoctambulist/hass-airtouch](https://github.com/TheNoctambulist/hass-airtouch) that adds a selectable AirTouch 4/5 direct-connection mode for consoles on a different subnet/VLAN to Home Assistant). The card also works with the upstream integration, and degrades gracefully on the built-in `airtouch4` core integration.
 
 ## Features
