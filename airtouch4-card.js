@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.4
+/*! AirTouch 4 Card v1.0.5
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.4";
+  const VERSION = "1.0.5";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -265,6 +265,21 @@
         ? mode
         : main.attributes.last_active_hvac_mode || "off";
       const [c1, c2] = MODE_COLORS[activeMode] || MODE_COLORS.off;
+
+      // Faint oversized mode icon watermark behind the gradient (inline SVG,
+      // no external images). Disable with show_watermark: false.
+      let bgLayers = `linear-gradient(145deg, ${c1} 0%, ${c2} 130%)`;
+      if (cfg.show_watermark !== false) {
+        const wmPath = ICONS[activeMode] || (isOn ? ICONS.auto : ICONS.power);
+        const wmSvg = encodeURIComponent(
+          `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>` +
+            `<path fill='rgba(255,255,255,0.055)' d='${wmPath}'/></svg>`
+        );
+        bgLayers =
+          `url("data:image/svg+xml,${wmSvg}") no-repeat ` +
+          `right -50px bottom -70px / 300px, ` +
+          bgLayers;
+      }
       const fanMode = main.attributes.fan_mode;
       const title = cfg.name || main.attributes.friendly_name || "AirTouch";
 
@@ -317,7 +332,7 @@
         ha-card {
           overflow: hidden;
           color: #fff;
-          background: linear-gradient(145deg, ${c1} 0%, ${c2} 130%);
+          background: ${bgLayers};
           border: none;
         }
         .wrap { padding: 14px 16px 16px; }
@@ -607,12 +622,18 @@
           label: "Show zone current temperature",
           selector: { boolean: {} },
         },
+        {
+          name: "show_watermark",
+          label: "Show background mode watermark",
+          selector: { boolean: {} },
+        },
       ];
       mainForm.data = {
         entity: this._config.entity || "",
         name: this._config.name || "",
         step: this._config.step ?? 1,
         show_zone_current: this._config.show_zone_current ?? true,
+        show_watermark: this._config.show_watermark ?? true,
       };
       mainForm.computeLabel = (s) => s.label || s.name;
       if (this._hass) mainForm.hass = this._hass;
