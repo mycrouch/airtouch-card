@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.3
+/*! AirTouch 4 Card v1.0.4
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.3";
+  const VERSION = "1.0.4";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -258,8 +258,13 @@
       }
 
       const mode = main.state;
-      const [c1, c2] = MODE_COLORS[mode] || MODE_COLORS.off;
       const isOn = mode !== "off";
+      // Like the native AirTouch app, the background reflects the selected
+      // mode even while the AC is off; only the power button shows on/off.
+      const activeMode = isOn
+        ? mode
+        : main.attributes.last_active_hvac_mode || "off";
+      const [c1, c2] = MODE_COLORS[activeMode] || MODE_COLORS.off;
       const fanMode = main.attributes.fan_mode;
       const title = cfg.name || main.attributes.friendly_name || "AirTouch";
 
@@ -291,7 +296,7 @@
         .filter((m) => m !== "off")
         .map(
           (m) => `
-          <button class="chip mode ${m === mode ? "active" : ""}" data-mode="${m}" title="${MODE_LABELS[m] || m}">
+          <button class="chip mode ${m === activeMode ? "active" : ""}" data-mode="${m}" title="${MODE_LABELS[m] || m}">
             ${svgIcon(ICONS[m] || ICONS.auto)}
           </button>`
         )
@@ -382,7 +387,7 @@
             <div class="zones">${zoneRows || `<div class="zone missing">No zones configured</div>`}</div>
             <div class="controls">
               <div class="ctl">
-                <span class="label">Mode &middot; ${MODE_LABELS[mode] || mode}</span>
+                <span class="label">Mode &middot; ${MODE_LABELS[activeMode] || activeMode}</span>
                 <div class="chips">${modeChips}</div>
               </div>
               <div class="ctl">
@@ -417,12 +422,22 @@
         );
       });
       root.querySelectorAll(".chip.mode").forEach((el) =>
-        el.addEventListener("click", () =>
-          this._callClimate("set_hvac_mode", {
-            entity_id: cfg.entity,
-            hvac_mode: el.dataset.mode,
-          })
-        )
+        el.addEventListener("click", () => {
+          // Prefer the hass-airtouch service that changes mode WITHOUT
+          // powering the AC on; climate.set_hvac_mode always turns it on.
+          const svcs = this._hass.services.airtouch;
+          if (svcs && svcs.set_hvac_mode_only) {
+            this._hass.callService("airtouch", "set_hvac_mode_only", {
+              entity_id: cfg.entity,
+              hvac_mode: el.dataset.mode,
+            });
+          } else {
+            this._callClimate("set_hvac_mode", {
+              entity_id: cfg.entity,
+              hvac_mode: el.dataset.mode,
+            });
+          }
+        })
       );
       root.querySelectorAll(".chip.fan").forEach((el) =>
         el.addEventListener("click", () =>
@@ -436,9 +451,10 @@
         el.addEventListener("click", () => {
           const zone = cfg.zones[Number(el.dataset.i)];
           const st = this._hass.states[zone.entity];
-          // Zone on/off via turn_on/turn_off — the airtouch4 integration's
-          // set_hvac_mode path is unreliable for zones ("AirTouchGroup" error).
-          this._callClimate(st.state === "off" ? "turn_on" : "turn_off", {
+          // Toggle based on the damper state, not the zone climate state —
+          // while the AC is off the climate entity always reports "off"
+          // even when the zone is selected.
+          this._callClimate(this._zoneOpen(zone, st) ? "turn_off" : "turn_on", {
             entity_id: zone.entity,
           });
         })
