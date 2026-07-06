@@ -1,4 +1,4 @@
-/*! AirTouch 4 Card v1.0.7
+/*! AirTouch 4 Card v1.0.8
  *  A Lovelace card for the Home Assistant AirTouch 4 integration.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone power / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.0.7";
+  const VERSION = "1.0.8";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -149,6 +149,48 @@
       this._config = null;
       this._hass = null;
       this._renderedKey = null;
+      this._entityMap = null;
+      this._mapBuilt = false;
+    }
+
+    // Resolve each zone's damper cover and spill sensor via the entity
+    // registry (zone entity -> device -> sibling entities). Robust against
+    // renamed entity IDs; falls back to naming-convention guesses.
+    async _buildEntityMap() {
+      this._mapBuilt = true;
+      try {
+        const reg = await this._hass.callWS({
+          type: "config/entity_registry/list",
+        });
+        const byId = new Map(reg.map((e) => [e.entity_id, e]));
+        const map = {};
+        for (const z of this._config.zones) {
+          const zr = byId.get(z.entity);
+          if (!zr || !zr.device_id) continue;
+          const siblings = reg.filter(
+            (e) => e.device_id === zr.device_id && e.entity_id !== z.entity
+          );
+          const named = (e) => e.entity_id + (e.original_name || "");
+          const damper =
+            siblings.find(
+              (e) => e.entity_id.startsWith("cover.") && /damper/i.test(named(e))
+            ) || siblings.find((e) => e.entity_id.startsWith("cover."));
+          const spill = siblings.find(
+            (e) =>
+              e.entity_id.startsWith("binary_sensor.") &&
+              /spill/i.test(named(e))
+          );
+          map[z.entity] = {
+            damper: damper ? damper.entity_id : null,
+            spill: spill ? spill.entity_id : null,
+          };
+        }
+        this._entityMap = map;
+        this._renderedKey = null;
+        if (this._hass && this._config) this._render();
+      } catch (err) {
+        /* registry unavailable — naming-convention fallbacks still apply */
+      }
     }
 
     static getConfigElement() {
@@ -177,12 +219,18 @@
         ),
       };
       this._renderedKey = null;
-      if (this._hass) this._render();
+      this._entityMap = null;
+      this._mapBuilt = false;
+      if (this._hass) {
+        this._render();
+        this._buildEntityMap();
+      }
     }
 
     set hass(hass) {
       this._hass = hass;
       if (!this._config) return;
+      if (!this._mapBuilt) this._buildEntityMap();
       // cheap change detection: re-render only when a watched entity changed
       const damperIds = this._config.zones
         .map((z) => this._damperEntity(z))
@@ -215,14 +263,21 @@
       // hass-airtouch exposes a damper cover per zone; it reflects zone
       // selection even while the AC is off (the zone climate entity doesn't).
       if (zone.damper_entity) return zone.damper_entity;
+      if (this._entityMap && zone.entity in this._entityMap) {
+        return this._entityMap[zone.entity].damper;
+      }
       const obj = zone.entity.split(".")[1];
       const guess = `cover.${obj}_damper`;
       return this._hass && this._hass.states[guess] ? guess : null;
     }
 
     _spillEntity(zone) {
-      // hass-airtouch exposes a spill binary sensor per zone.
+      // hass-airtouch exposes a spill binary sensor only for zones the
+      // integration knows are spill zones — no user configuration needed.
       if (zone.spill_entity) return zone.spill_entity;
+      if (this._entityMap && zone.entity in this._entityMap) {
+        return this._entityMap[zone.entity].spill;
+      }
       const obj = zone.entity.split(".")[1];
       const guess = `binary_sensor.${obj}_spill`;
       return this._hass && this._hass.states[guess] ? guess : null;
