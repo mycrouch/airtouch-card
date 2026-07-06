@@ -72,6 +72,7 @@ zones:                           # auto-discovered; override to reorder/rename
 |---|---|---|
 | `entity` | required | Main AC climate entity |
 | `name` | entity name | Card title |
+| `style` | `bold` | `default` (no background, follows theme), `bold` (dark mode-tinted gradient), or `light` (pastel mode-tinted gradient) |
 | `step` | `1` | Zone setpoint increment (°C) |
 | `show_zone_current` | `true` | Show each zone's measured temperature |
 | `show_watermark` | `true` | Faint mode-icon watermark behind the gradient |

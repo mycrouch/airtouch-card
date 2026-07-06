@@ -1,4 +1,4 @@
-/*! AirTouch Card v1.1.0
+/*! AirTouch Card v1.2.0
  *  A Lovelace card for Polyaire AirTouch 4 and AirTouch 5 systems.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone selection / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.1.0";
+  const VERSION = "1.2.0";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -77,6 +77,96 @@
 
   const svgIcon = (path, cls = "") =>
     `<svg class="${cls}" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
+
+  const mixHex = (a, b, t) => {
+    const ah = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+    const bh = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+    return (
+      "#" +
+      ah
+        .map((x, i) =>
+          Math.round(x + (bh[i] - x) * t)
+            .toString(16)
+            .padStart(2, "0")
+        )
+        .join("")
+    );
+  };
+
+  // Style palettes: bold = dark mode-tinted gradients (original look),
+  // light = pastel versions of the same mode colours with dark text,
+  // default = no background, colours follow the active theme.
+  const stylePalette = (style, c1, c2, isOn) => {
+    if (style === "light") {
+      const prim = mixHex(c2, "#000000", 0.15);
+      return {
+        bg: `linear-gradient(145deg, ${mixHex(c2, "#ffffff", 0.88)} 0%, ${mixHex(c2, "#ffffff", 0.62)} 130%)`,
+        text: "#212121",
+        dim: "rgba(0,0,0,.6)",
+        powerBg: isOn ? "rgba(255,255,255,.7)" : "rgba(255,255,255,.4)",
+        powerFg: isOn ? "#1b8a3a" : "rgba(0,0,0,.45)",
+        powerHover: "rgba(255,255,255,.85)",
+        zoneBg: "rgba(255,255,255,.35)",
+        zoneOnBg: "rgba(255,255,255,.7)",
+        zoneIcon: "rgba(0,0,0,.35)",
+        zoneIconOn: "#1b8a3a",
+        chipBg: "rgba(255,255,255,.5)",
+        chipFg: "rgba(0,0,0,.6)",
+        chipActiveBg: prim,
+        chipActiveFg: "#ffffff",
+        chipHover: "rgba(255,255,255,.75)",
+        good: "#1b8a3a",
+        batt: "#a06d00",
+        missing: "#b3261e",
+        wmFill: "rgba(0,0,0,0.05)",
+      };
+    }
+    if (style === "default") {
+      return {
+        bg: null,
+        text: "var(--primary-text-color)",
+        dim: "var(--secondary-text-color)",
+        powerBg: isOn ? "rgba(127,127,127,.22)" : "rgba(127,127,127,.1)",
+        powerFg: isOn ? "var(--state-active-color, #22a548)" : "var(--secondary-text-color)",
+        powerHover: "rgba(127,127,127,.3)",
+        zoneBg: "rgba(127,127,127,.10)",
+        zoneOnBg: "rgba(127,127,127,.22)",
+        zoneIcon: "var(--disabled-text-color, rgba(127,127,127,.6))",
+        zoneIconOn: "var(--state-active-color, #22a548)",
+        chipBg: "rgba(127,127,127,.15)",
+        chipFg: "var(--secondary-text-color)",
+        chipActiveBg: "var(--primary-color)",
+        chipActiveFg: "var(--text-primary-color, #fff)",
+        chipHover: "rgba(127,127,127,.28)",
+        good: "var(--state-active-color, #22a548)",
+        batt: "var(--warning-color, #b8860b)",
+        missing: "var(--error-color, #b3261e)",
+        wmFill: null,
+      };
+    }
+    // bold (original look; also the fallback for unknown values)
+    return {
+      bg: `linear-gradient(145deg, ${c1} 0%, ${c2} 130%)`,
+      text: "#fff",
+      dim: "rgba(255,255,255,.72)",
+      powerBg: isOn ? "rgba(255,255,255,.22)" : "rgba(255,255,255,.08)",
+      powerFg: isOn ? "#7CFC98" : "rgba(255,255,255,.55)",
+      powerHover: "rgba(255,255,255,.3)",
+      zoneBg: "rgba(0,0,0,.18)",
+      zoneOnBg: "rgba(255,255,255,.10)",
+      zoneIcon: "rgba(255,255,255,.45)",
+      zoneIconOn: "#7CFC98",
+      chipBg: "rgba(0,0,0,.22)",
+      chipFg: "rgba(255,255,255,.65)",
+      chipActiveBg: "rgba(255,255,255,.9)",
+      chipActiveFg: c2,
+      chipHover: "rgba(0,0,0,.35)",
+      good: "#7CFC98",
+      batt: "#ffcc66",
+      missing: "#ffb4a9",
+      wmFill: "rgba(255,255,255,0.055)",
+    };
+  };
 
   const fmt = (v, dp = 1) =>
     v === null || v === undefined || isNaN(v) ? "--" : Number(v).toFixed(dp).replace(/\.0$/, "");
@@ -369,15 +459,17 @@
         ? mode
         : main.attributes.last_active_hvac_mode || "off";
       const [c1, c2] = MODE_COLORS[activeMode] || MODE_COLORS.off;
+      const pal = stylePalette(cfg.style || "bold", c1, c2, isOn);
 
       // Faint oversized mode icon watermark behind the gradient (inline SVG,
-      // no external images). Disable with show_watermark: false.
-      let bgLayers = `linear-gradient(145deg, ${c1} 0%, ${c2} 130%)`;
-      if (cfg.show_watermark !== false) {
+      // no external images). Disable with show_watermark: false. Not shown
+      // in the "default" style (no background of our own to draw on).
+      let bgLayers = pal.bg;
+      if (bgLayers && pal.wmFill && cfg.show_watermark !== false) {
         const wmPath = ICONS[activeMode] || (isOn ? ICONS.auto : ICONS.power);
         const wmSvg = encodeURIComponent(
           `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>` +
-            `<path fill='rgba(255,255,255,0.055)' d='${wmPath}'/></svg>`
+            `<path fill='${pal.wmFill}' d='${wmPath}'/></svg>`
         );
         bgLayers =
           `url("data:image/svg+xml,${wmSvg}") no-repeat ` +
@@ -454,9 +546,8 @@
         :host { display: block; }
         ha-card {
           overflow: hidden;
-          color: #fff;
-          background: ${bgLayers};
-          border: none;
+          color: ${pal.text};
+          ${bgLayers ? `background: ${bgLayers}; border: none;` : ""}
         }
         .wrap { padding: 14px 16px 16px; }
         svg { fill: currentColor; width: 100%; height: 100%; display: block; }
@@ -469,11 +560,11 @@
         .mainpower {
           width: 34px; height: 34px; border-radius: 50%;
           padding: 6px; box-sizing: border-box;
-          background: rgba(255,255,255,${isOn ? ".22" : ".08"});
-          color: ${isOn ? "#7CFC98" : "rgba(255,255,255,.55)"};
+          background: ${pal.powerBg};
+          color: ${pal.powerFg};
           transition: background .2s;
         }
-        .mainpower:hover { background: rgba(255,255,255,.3); }
+        .mainpower:hover { background: ${pal.powerHover}; }
         .title { font-size: 1.05em; font-weight: 500; flex: 1; opacity: .95;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bigtemp { font-size: 2.6em; font-weight: 300; letter-spacing: -1px; }
@@ -484,20 +575,20 @@
         .zone {
           display: flex; align-items: center; gap: 8px;
           padding: 5px 8px; border-radius: 10px;
-          background: rgba(0,0,0,.18); opacity: .75;
+          background: ${pal.zoneBg}; opacity: .78;
         }
-        .zone.on { opacity: 1; background: rgba(255,255,255,.10); }
-        .zone.missing { color: #ffb4a9; font-size: .85em; }
+        .zone.on { opacity: 1; background: ${pal.zoneOnBg}; }
+        .zone.missing { color: ${pal.missing}; font-size: .85em; }
         .zpower { width: 24px; height: 24px; flex: none;
-          color: rgba(255,255,255,.45); }
-        .zone.on .zpower { color: #7CFC98; }
+          color: ${pal.zoneIcon}; }
+        .zone.on .zpower { color: ${pal.zoneIconOn}; }
         .zname { flex: 1; font-size: .95em; white-space: nowrap;
           overflow: hidden; text-overflow: ellipsis; cursor: pointer;
           -webkit-user-select: none; user-select: none; }
         .spill { width: 15px; height: 15px; flex: none; opacity: .3; line-height: 0; }
-        .spill.active { opacity: .95; color: #7CFC98; }
+        .spill.active { opacity: .95; color: ${pal.good}; }
         .batt { width: 15px; height: 15px; flex: none; opacity: .95;
-          line-height: 0; color: #ffcc66; }
+          line-height: 0; color: ${pal.batt}; }
         .zbtn { width: 22px; height: 22px; flex: none; opacity: .85; }
         .zbtn:hover { opacity: 1; }
         .zset { width: 38px; text-align: center; font-size: 1.05em; font-weight: 500; }
@@ -513,12 +604,12 @@
         .chip {
           width: 30px; height: 30px; border-radius: 50%;
           padding: 7px; box-sizing: border-box; flex: none;
-          background: rgba(0,0,0,.22); color: rgba(255,255,255,.65);
+          background: ${pal.chipBg}; color: ${pal.chipFg};
         }
         .chip.fan { padding: 0; }
         .fanlabel { font-size: .85em; font-weight: 600; line-height: 30px; }
-        .chip.active { background: rgba(255,255,255,.9); color: ${c2}; }
-        .chip:hover:not(.active) { background: rgba(0,0,0,.35); }
+        .chip.active { background: ${pal.chipActiveBg}; color: ${pal.chipActiveFg}; }
+        .chip:hover:not(.active) { background: ${pal.chipHover}; }
       </style>
       <ha-card>
         <div class="wrap">
@@ -750,6 +841,20 @@
         },
         { name: "name", label: "Card title (optional)", selector: { text: {} } },
         {
+          name: "style",
+          label: "Style",
+          selector: {
+            select: {
+              mode: "dropdown",
+              options: [
+                { value: "default", label: "Default — no background, follows theme" },
+                { value: "bold", label: "Bold — dark gradient, changes with mode" },
+                { value: "light", label: "Light — pastel gradient, changes with mode" },
+              ],
+            },
+          },
+        },
+        {
           name: "step",
           label: "Zone setpoint step (°C)",
           selector: { number: { min: 0.5, max: 5, step: 0.5, mode: "box" } },
@@ -768,6 +873,7 @@
       mainForm.data = {
         entity: this._config.entity || "",
         name: this._config.name || "",
+        style: this._config.style || "bold",
         step: this._config.step ?? 1,
         show_zone_current: this._config.show_zone_current ?? true,
         show_watermark: this._config.show_watermark ?? true,
