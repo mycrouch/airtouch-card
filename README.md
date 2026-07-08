@@ -2,12 +2,6 @@
 
 A Lovelace card for **AirTouch 4 and AirTouch 5** systems in Home Assistant, recreating the Polyaire AirTouch console experience: main AC power, mode and fan control, plus per-zone selection and setpoints — all in one card with a GUI editor and zone auto-discovery.
 
-<p align="center">
-  <img src="images/card-heat.png" width="59%" alt="AirTouch 4 Card — heat mode, wide column">
-  <img src="images/card-cool.png" width="35%" alt="AirTouch 4 Card — cool mode, narrow column">
-</p>
-
-
 ### Three styles, selectable in the GUI editor
 
 <p align="center">
