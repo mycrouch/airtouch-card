@@ -1,4 +1,4 @@
-/*! AirTouch Card v1.2.1
+/*! AirTouch Card v1.3.0
  *  A Lovelace card for Polyaire AirTouch 4 and AirTouch 5 systems.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone selection / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.2.1";
+  const VERSION = "1.3.0";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -121,7 +121,7 @@
         wmFill: "rgba(0,0,0,0.05)",
       };
     }
-    if (style === "default") {
+    if (style === "default" || style === "theme") {
       return {
         bg: null,
         text: "var(--primary-text-color)",
@@ -252,6 +252,30 @@
       this._renderedKey = null;
       this._entityMap = null;
       this._mapBuilt = false;
+      this._appliedThemeVars = null;
+    }
+
+    // Apply a named installed theme to this card only (style: theme).
+    _applyCardTheme() {
+      if (this._appliedThemeVars) {
+        for (const p of this._appliedThemeVars) this.style.removeProperty(p);
+        this._appliedThemeVars = null;
+      }
+      const name = this._config.style === "theme" ? this._config.theme : null;
+      if (!name || !this._hass || !this._hass.themes) return;
+      const theme = this._hass.themes.themes && this._hass.themes.themes[name];
+      if (!theme) return;
+      let vars = { ...theme };
+      if (vars.modes) {
+        const m = this._hass.themes.darkMode ? vars.modes.dark : vars.modes.light;
+        delete vars.modes;
+        vars = { ...vars, ...(m || {}) };
+      }
+      this._appliedThemeVars = [];
+      for (const [k, v] of Object.entries(vars)) {
+        this.style.setProperty(`--${k}`, v);
+        this._appliedThemeVars.push(`--${k}`);
+      }
     }
 
     // Resolve each zone's damper cover and spill sensor via the entity
@@ -338,6 +362,14 @@
       this._hass = hass;
       if (!this._config) return;
       if (!this._mapBuilt) this._buildEntityMap();
+      const wantTheme = this._config.style === "theme" ? this._config.theme : null;
+      const dark = hass.themes && hass.themes.darkMode;
+      if (this._cardThemeName !== wantTheme || this._cardThemeDark !== dark) {
+        this._applyCardTheme();
+        this._cardThemeName = wantTheme;
+        this._cardThemeDark = dark;
+        this._renderedKey = null;
+      }
       // cheap change detection: re-render only when a watched entity changed
       const damperIds = this._config.zones
         .map((z) => this._damperEntity(z))
@@ -707,6 +739,138 @@
     }
   }
 
+
+// ---------------------------------------------------------------------
+// Theme picker with gradient swatches: shows a small sample chip for each
+// installed theme (from its ha-card-background / card-gradient variable).
+// ---------------------------------------------------------------------
+class AirTouchThemePicker extends HTMLElement {
+  constructor() {
+    super();
+    this._open = false;
+    this._value = '';
+    this._hass = null;
+    this._themesRef = null;
+    this._outside = (e) => {
+      if (!e.composedPath().includes(this)) this._toggle(false);
+    };
+  }
+
+  set hass(h) {
+    this._hass = h;
+    if (h && h.themes !== this._themesRef) {
+      this._themesRef = h.themes;
+      this._render();
+    }
+  }
+
+  set value(v) {
+    if ((v || '') === this._value) return;
+    this._value = v || '';
+    this._render();
+  }
+  get value() {
+    return this._value;
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener('click', this._outside, true);
+  }
+
+  _grad(name) {
+    const t =
+      this._hass && this._hass.themes && this._hass.themes.themes
+        ? this._hass.themes.themes[name]
+        : null;
+    if (!t) return null;
+    const pick = (o) =>
+      o && (o['card-gradient'] || o['ha-card-background'] || o['card-background-color']);
+    const g =
+      pick(t) || pick(t.modes && t.modes.light) || pick(t.modes && t.modes.dark);
+    if (
+      typeof g === 'string' &&
+      (g.startsWith('linear-gradient') || g.startsWith('#') || g.startsWith('rgb'))
+    )
+      return g;
+    return null;
+  }
+
+  _toggle(open) {
+    if (open === this._open) return;
+    this._open = open;
+    if (open) document.addEventListener('click', this._outside, true);
+    else document.removeEventListener('click', this._outside, true);
+    this._render();
+  }
+
+  _render() {
+    const names =
+      this._hass && this._hass.themes && this._hass.themes.themes
+        ? Object.keys(this._hass.themes.themes).sort()
+        : [];
+    const chip = (g) =>
+      `<span class="tp-chip" style="background:${g || 'var(--divider-color,#ccc)'}"></span>`;
+    this.innerHTML = `
+      <style>
+        .tp-wrap { position: relative; display: block; margin-top: 12px; }
+        .tp-field { display: flex; align-items: center; gap: 10px;
+          border: 1px solid var(--divider-color, #ccc); border-radius: 8px;
+          padding: 12px; cursor: pointer;
+          background: var(--mdc-text-field-fill-color, var(--secondary-background-color, #f5f5f5)); }
+        .tp-lbl { font-size: .75em; color: var(--secondary-text-color); }
+        .tp-chip { width: 30px; height: 18px; border-radius: 4px; flex: none;
+          border: 1px solid rgba(127,127,127,.35); }
+        .tp-name { flex: 1; color: var(--primary-text-color); }
+        .tp-caret { opacity: .6; }
+        .tp-list { position: absolute; z-index: 12; left: 0; right: 0; top: calc(100% + 2px);
+          max-height: 280px; overflow: auto;
+          background: var(--card-background-color, #fff);
+          border: 1px solid var(--divider-color, #ccc); border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+        .tp-opt { display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+          cursor: pointer; color: var(--primary-text-color); }
+        .tp-opt:hover { background: rgba(127,127,127,.12); }
+        .tp-opt.sel { background: rgba(127,127,127,.2); }
+      </style>
+      <div class="tp-wrap">
+        <div class="tp-field" role="button" aria-haspopup="listbox">
+          ${chip(this._grad(this._value))}
+          <span class="tp-name">${this._value || 'Select a theme'}<br><span class="tp-lbl">Theme</span></span>
+          <span class="tp-caret">&#9662;</span>
+        </div>
+        ${
+          this._open
+            ? `<div class="tp-list" role="listbox">${names
+                .map(
+                  (n) =>
+                    `<div class="tp-opt ${n === this._value ? 'sel' : ''}" data-n="${n}">${chip(this._grad(n))}<span>${n}</span></div>`
+                )
+                .join('')}</div>`
+            : ''
+        }
+      </div>`;
+    this.querySelector('.tp-field').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._toggle(!this._open);
+    });
+    this.querySelectorAll('.tp-opt').forEach((o) =>
+      o.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._value = o.dataset.n;
+        this._toggle(false);
+        this._render();
+        this.dispatchEvent(
+          new CustomEvent('value-changed', {
+            detail: { value: this._value },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      })
+    );
+  }
+}
+
   /* ------------------------------------------------------------------ *
    *  The GUI editor                                                    *
    * ------------------------------------------------------------------ */
@@ -722,6 +886,7 @@
     set hass(hass) {
       this._hass = hass;
       this._forms().forEach((f) => (f.hass = hass));
+      if (this._picker) this._picker.hass = hass;
       this._maybeAutoDiscover();
     }
 
@@ -850,6 +1015,7 @@
                 { value: "default", label: "Default — no background, follows theme" },
                 { value: "bold", label: "Bold — dark gradient, changes with mode" },
                 { value: "light", label: "Light — pastel gradient, changes with mode" },
+                { value: "theme", label: "Theme — apply an installed theme to this card" },
               ],
             },
           },
@@ -884,12 +1050,30 @@
         ev.stopPropagation();
         const v = ev.detail.value;
         const entityChanged = v.entity !== this._config.entity;
+        const styleChanged = v.style !== (this._config.style || "bold");
         this._config = { ...this._config, ...v };
         if (!this._config.name) delete this._config.name;
+        if (this._config.style !== "theme") delete this._config.theme;
         if (entityChanged) this._autoDiscovered = false;
         this._emit();
         this._maybeAutoDiscover();
+        if (styleChanged) this._render();
       });
+
+      if ((this._config.style || "bold") === "theme") {
+        const picker = document.createElement("airtouch-theme-picker");
+        if (this._hass) picker.hass = this._hass;
+        picker.value = this._config.theme || "";
+        picker.addEventListener("value-changed", (ev) => {
+          ev.stopPropagation();
+          this._config = { ...this._config, theme: ev.detail.value };
+          this._emit();
+        });
+        mainForm.insertAdjacentElement("afterend", picker);
+        this._picker = picker;
+      } else {
+        this._picker = null;
+      }
 
       this.shadowRoot
         .getElementById("discover")
@@ -982,6 +1166,9 @@
   }
   if (!customElements.get("airtouch-card-editor")) {
     customElements.define("airtouch-card-editor", AirTouch4CardEditor);
+  }
+  if (!customElements.get("airtouch-theme-picker")) {
+    customElements.define("airtouch-theme-picker", AirTouchThemePicker);
   }
   if (!customElements.get("airtouch4-card-editor")) {
     customElements.define(
