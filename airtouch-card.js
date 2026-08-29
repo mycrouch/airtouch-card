@@ -1,4 +1,4 @@
-/*! AirTouch Card v1.3.0
+/*! AirTouch Card v1.3.1
  *  A Lovelace card for Polyaire AirTouch 4 and AirTouch 5 systems.
  *  Replicates the classic AirTouch console look: main AC status, mode,
  *  fan speed, and per-zone selection / setpoint control.
@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.3.0";
+  const VERSION = "1.3.1";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -77,6 +77,17 @@
 
   const svgIcon = (path, cls = "") =>
     `<svg class="${cls}" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
+
+  /* Escape freeform text before it goes into innerHTML. Applies to anything
+     authored by the user or an integration: card/zone names, climate state
+     attribute values, theme names and theme gradient values. */
+  const esc = (v) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
 
   const mixHex = (a, b, t) => {
     const ah = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
@@ -479,7 +490,7 @@
 
       if (!main) {
         this.shadowRoot.innerHTML = `<ha-card><div style="padding:16px;color:var(--error-color)">
-          airtouch4-card: entity <b>${cfg.entity}</b> not found</div></ha-card>`;
+          airtouch4-card: entity <b>${esc(cfg.entity)}</b> not found</div></ha-card>`;
         return;
       }
 
@@ -540,10 +551,10 @@
           const battLow = battId && hass.states[battId]?.state === "on";
           return `
           <div class="zone ${zOn ? "on" : ""}">
-            <button class="zpower" data-i="${i}" title="${zOn ? "Deselect" : "Select"} ${zName}">
+            <button class="zpower" data-i="${i}" title="${zOn ? "Deselect" : "Select"} ${esc(zName)}">
               ${svgIcon(zOn ? ICONS.zone_on : ICONS.zone_off)}
             </button>
-            <span class="zname" data-i="${i}" role="button" title="${zOn ? "Deselect" : "Select"} ${zName}">${zName}</span>
+            <span class="zname" data-i="${i}" role="button" title="${zOn ? "Deselect" : "Select"} ${esc(zName)}">${esc(zName)}</span>
             ${battLow ? `<span class="batt" title="Sensor battery low">${svgIcon(ICONS.battery_low)}</span>` : ""}
             ${spillId ? `<span class="spill ${spilling ? "active" : ""}" title="${spilling ? "Spill active" : "Spill zone"}"><svg viewBox="0 0 24 24"><path transform="rotate(90 12 12)" d="${ICONS.spill}"/></svg></span>` : ""}
             <button class="zbtn zdown" data-i="${i}" title="Decrease">${svgIcon(ICONS.minus)}</button>
@@ -558,7 +569,7 @@
         .filter((m) => m !== "off")
         .map(
           (m) => `
-          <button class="chip mode ${m === activeMode ? "active" : ""}" data-mode="${m}" title="${MODE_LABELS[m] || m}">
+          <button class="chip mode ${m === activeMode ? "active" : ""}" data-mode="${esc(m)}" title="${esc(MODE_LABELS[m] || m)}">
             ${svgIcon(ICONS[m] || ICONS.auto)}
           </button>`
         )
@@ -567,8 +578,8 @@
       const fanChips = (main.attributes.fan_modes || [])
         .map(
           (f) => `
-          <button class="chip fan ${f === fanMode ? "active" : ""}" data-fan="${f}" title="${FAN_LABELS[f] || f}">
-            <span class="fanlabel">${(FAN_LABELS[f] || f)[0]}</span>
+          <button class="chip fan ${f === fanMode ? "active" : ""}" data-fan="${esc(f)}" title="${esc(FAN_LABELS[f] || f)}">
+            <span class="fanlabel">${esc((FAN_LABELS[f] || f)[0])}</span>
           </button>`
         )
         .join("");
@@ -647,7 +658,7 @@
         <div class="wrap">
           <div class="head">
             <button class="mainpower" title="${isOn ? "Turn off" : "Turn on"}">${svgIcon(ICONS.power)}</button>
-            <span class="title">${title}</span>
+            <span class="title">${esc(title)}</span>
             <span class="bigtemp" title="AC target temperature">${fmt(acSetpoint, 0)}<span class="unit">&deg;C</span></span>
           </div>
           <div class="body">
@@ -809,7 +820,7 @@ class AirTouchThemePicker extends HTMLElement {
         ? Object.keys(this._hass.themes.themes).sort()
         : [];
     const chip = (g) =>
-      `<span class="tp-chip" style="background:${g || 'var(--divider-color,#ccc)'}"></span>`;
+      `<span class="tp-chip" style="background:${esc(g || 'var(--divider-color,#ccc)')}"></span>`;
     this.innerHTML = `
       <style>
         .tp-wrap { position: relative; display: block; margin-top: 12px; }
@@ -835,7 +846,7 @@ class AirTouchThemePicker extends HTMLElement {
       <div class="tp-wrap">
         <div class="tp-field" role="button" aria-haspopup="listbox">
           ${chip(this._grad(this._value))}
-          <span class="tp-name">${this._value || 'Select a theme'}<br><span class="tp-lbl">Theme</span></span>
+          <span class="tp-name">${esc(this._value || 'Select a theme')}<br><span class="tp-lbl">Theme</span></span>
           <span class="tp-caret">&#9662;</span>
         </div>
         ${
@@ -843,7 +854,7 @@ class AirTouchThemePicker extends HTMLElement {
             ? `<div class="tp-list" role="listbox">${names
                 .map(
                   (n) =>
-                    `<div class="tp-opt ${n === this._value ? 'sel' : ''}" data-n="${n}">${chip(this._grad(n))}<span>${n}</span></div>`
+                    `<div class="tp-opt ${n === this._value ? 'sel' : ''}" data-n="${esc(n)}">${chip(this._grad(n))}<span>${esc(n)}</span></div>`
                 )
                 .join('')}</div>`
             : ''
@@ -1093,7 +1104,7 @@ class AirTouchThemePicker extends HTMLElement {
         div.className = "zone";
         div.innerHTML = `
           <div class="zonehead">
-            <span>Zone ${i + 1}${zone.name ? ` — ${zone.name}` : ""}</span>
+            <span>Zone ${i + 1}${zone.name ? ` — ${esc(zone.name)}` : ""}</span>
             <button class="rm">Remove</button>
           </div>`;
         const form = document.createElement("ha-form");
