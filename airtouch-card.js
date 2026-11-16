@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.4.1";
+  const VERSION = "1.4.2";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -654,7 +654,7 @@
         .bigtemp { font-size: 2.6em; font-weight: 300; letter-spacing: -1px; }
         .bigtemp .unit { font-size: .45em; vertical-align: super; opacity: .8; }
         /* body */
-        .body { display: flex; gap: 18px; margin-top: 12px; flex-wrap: wrap; }
+        .body { display: flex; gap: 18px; margin-top: ${autoHead ? 20 : 12}px; flex-wrap: wrap; }
         .zones { flex: 1 1 260px; min-width: 240px; display: flex; flex-direction: column; gap: 4px; }
         .zone {
           display: flex; align-items: center; gap: 8px;
