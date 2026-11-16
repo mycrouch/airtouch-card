@@ -65,6 +65,11 @@ name: Daikin AC                  # optional card title
 step: 1                          # optional, zone setpoint step in °C
 show_zone_current: true          # optional, zone current temperature
 show_watermark: true             # optional, background mode watermark
+auto_entity: input_boolean.ac_auto_dry              # optional automation on/off toggle
+auto_name: Auto dry                                 # optional toggle label
+auto_status_entity: input_select.ac_auto_dry_state  # optional status shown beside the label
+auto_status_map:                                    # optional state -> label map
+  holding: Holding in dry
 zones:                           # auto-discovered; override to reorder/rename
   - entity: climate.lounge_room_lounge
     name: Lounge                 # display-name override (card only)
@@ -80,6 +85,11 @@ zones:                           # auto-discovered; override to reorder/rename
 | `step` | `1` | Zone setpoint increment (°C) |
 | `show_zone_current` | `true` | Show each zone's measured temperature |
 | `show_watermark` | `true` | Faint mode-icon watermark behind the gradient |
+| `auto_entity` | — | `input_boolean`, `switch` or `automation` shown as a toggle (e.g. an auto-dry automation enable) |
+| `auto_name` | entity name | Label for the toggle |
+| `auto_icon` | `dry` | Icon key for the toggle knob (any mode icon: `cool`, `dry`, `auto`, …) |
+| `auto_status_entity` | — | Entity whose state is shown next to the label while the toggle is on |
+| `auto_status_map` | — | Map of status states to display text |
 | `zones[].entity` | required | Zone climate entity |
 | `zones[].name` | entity name | Display name (card-only rename) |
 | `zones[].damper_entity` | auto | Override the zone's damper cover entity |

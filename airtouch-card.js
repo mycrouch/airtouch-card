@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.3.1";
+  const VERSION = "1.4.0";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -397,7 +397,10 @@
         ...damperIds,
         ...spillIds,
         ...batteryIds,
+        this._config.auto_entity,
+        this._config.auto_status_entity,
       ]
+        .filter(Boolean)
         .map((id) => {
           const st = hass.states[id];
           return st ? `${id}:${st.state}:${JSON.stringify(st.attributes)}` : `${id}:missing`;
@@ -584,6 +587,31 @@
         )
         .join("");
 
+      // Optional automation toggle (e.g. an input_boolean that enables an
+      // auto-dry / comfort automation), with an optional status entity.
+      let autoCtl = "";
+      if (cfg.auto_entity) {
+        const aSt = hass.states[cfg.auto_entity];
+        const aOn = aSt?.state === "on";
+        const aName = cfg.auto_name || aSt?.attributes.friendly_name || "Auto";
+        let aStatus = aSt ? (aOn ? "On" : "Off") : "missing";
+        if (aOn && cfg.auto_status_entity) {
+          const sSt = hass.states[cfg.auto_status_entity];
+          if (sSt) {
+            const map = cfg.auto_status_map || {};
+            const raw = sSt.state;
+            aStatus = map[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, " "));
+          }
+        }
+        autoCtl = `
+              <div class="ctl auto">
+                <span class="label">${esc(aName)} &middot; ${esc(aStatus)}</span>
+                <button class="autotoggle ${aOn ? "on" : ""}" role="switch" aria-checked="${aOn}" title="${aOn ? "Disable" : "Enable"} ${esc(aName)}">
+                  <span class="knob">${svgIcon(ICONS[cfg.auto_icon] || ICONS.dry)}</span>
+                </button>
+              </div>`;
+      }
+
       this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; }
@@ -653,6 +681,18 @@
         .fanlabel { font-size: .85em; font-weight: 600; line-height: 30px; }
         .chip.active { background: ${pal.chipActiveBg}; color: ${pal.chipActiveFg}; }
         .chip:hover:not(.active) { background: ${pal.chipHover}; }
+        .autotoggle {
+          width: 58px; height: 30px; border-radius: 15px; position: relative;
+          background: ${pal.chipBg}; transition: background .2s;
+        }
+        .autotoggle .knob {
+          position: absolute; top: 3px; left: 3px; width: 24px; height: 24px;
+          border-radius: 50%; padding: 4px; box-sizing: border-box;
+          background: ${pal.chipFg}; color: ${pal.chipBg};
+          transition: left .2s, background .2s, color .2s;
+        }
+        .autotoggle.on { background: ${pal.chipActiveBg}; }
+        .autotoggle.on .knob { left: 31px; background: ${pal.chipActiveFg}; color: ${pal.chipActiveBg}; }
       </style>
       <ha-card>
         <div class="wrap">
@@ -671,7 +711,7 @@
               <div class="ctl">
                 <span class="label">Fan &middot; ${FAN_LABELS[fanMode] || fanMode || "--"}</span>
                 <div class="chips">${fanChips}</div>
-              </div>
+              </div>${autoCtl}
             </div>
           </div>
         </div>
@@ -717,6 +757,16 @@
           }
         })
       );
+      root.querySelector(".autotoggle")?.addEventListener("click", () => {
+        const id = cfg.auto_entity;
+        const domain = id.split(".")[0];
+        const st = this._hass.states[id];
+        this._hass.callService(
+          ["input_boolean", "switch", "automation"].includes(domain) ? domain : "homeassistant",
+          st?.state === "on" ? "turn_off" : "turn_on",
+          { entity_id: id }
+        );
+      });
       root.querySelectorAll(".chip.fan").forEach((el) =>
         el.addEventListener("click", () =>
           this._callClimate("set_fan_mode", {
@@ -1046,6 +1096,17 @@ class AirTouchThemePicker extends HTMLElement {
           label: "Show background mode watermark",
           selector: { boolean: {} },
         },
+        {
+          name: "auto_entity",
+          label: "Automation toggle (optional, e.g. input_boolean)",
+          selector: { entity: { domain: ["input_boolean", "switch", "automation"] } },
+        },
+        { name: "auto_name", label: "Toggle label (optional)", selector: { text: {} } },
+        {
+          name: "auto_status_entity",
+          label: "Automation status entity (optional, e.g. input_select)",
+          selector: { entity: {} },
+        },
       ];
       mainForm.data = {
         entity: this._config.entity || "",
@@ -1054,6 +1115,9 @@ class AirTouchThemePicker extends HTMLElement {
         step: this._config.step ?? 1,
         show_zone_current: this._config.show_zone_current ?? true,
         show_watermark: this._config.show_watermark ?? true,
+        auto_entity: this._config.auto_entity || "",
+        auto_name: this._config.auto_name || "",
+        auto_status_entity: this._config.auto_status_entity || "",
       };
       mainForm.computeLabel = (s) => s.label || s.name;
       if (this._hass) mainForm.hass = this._hass;
@@ -1064,6 +1128,9 @@ class AirTouchThemePicker extends HTMLElement {
         const styleChanged = v.style !== (this._config.style || "bold");
         this._config = { ...this._config, ...v };
         if (!this._config.name) delete this._config.name;
+        for (const k of ["auto_entity", "auto_name", "auto_status_entity"]) {
+          if (!this._config[k]) delete this._config[k];
+        }
         if (this._config.style !== "theme") delete this._config.theme;
         if (entityChanged) this._autoDiscovered = false;
         this._emit();
