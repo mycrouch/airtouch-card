@@ -8,7 +8,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "1.4.0";
+  const VERSION = "1.4.1";
 
   /* ------------------------------------------------------------------ *
    *  MDI icon paths (Material Design Icons, Apache 2.0)                *
@@ -590,6 +590,7 @@
       // Optional automation toggle (e.g. an input_boolean that enables an
       // auto-dry / comfort automation), with an optional status entity.
       let autoCtl = "";
+      let autoHead = "";
       if (cfg.auto_entity) {
         const aSt = hass.states[cfg.auto_entity];
         const aOn = aSt?.state === "on";
@@ -603,7 +604,19 @@
             aStatus = map[raw] ?? (raw.charAt(0).toUpperCase() + raw.slice(1).replace(/_/g, " "));
           }
         }
-        autoCtl = `
+        const toggle = `
+                <button class="autotoggle ${aOn ? "on" : ""}" role="switch" aria-checked="${aOn}" title="${aOn ? "Disable" : "Enable"} ${esc(aName)}">
+                  <span class="knob">${svgIcon(ICONS[cfg.auto_icon] || ICONS.dry)}</span>
+                </button>`;
+        if (cfg.auto_position === "header") {
+          autoHead = `
+            <div class="headauto">
+              <div class="headautotext">
+                <span class="haname">${esc(aName)}</span>
+                <span class="hastatus">${esc(aStatus)}</span>
+              </div>${toggle}
+            </div>`;
+        } else autoCtl = `
               <div class="ctl auto">
                 <span class="label">${esc(aName)} &middot; ${esc(aStatus)}</span>
                 <button class="autotoggle ${aOn ? "on" : ""}" role="switch" aria-checked="${aOn}" title="${aOn ? "Disable" : "Enable"} ${esc(aName)}">
@@ -692,6 +705,11 @@
           transition: left .2s, background .2s, color .2s;
         }
         .autotoggle.on { background: ${pal.chipActiveBg}; }
+        .headauto { display: flex; align-items: center; gap: 8px; }
+        .headautotext { display: flex; flex-direction: column; align-items: flex-end;
+          line-height: 1.15; }
+        .haname { font-size: .72em; text-transform: uppercase; letter-spacing: .05em; opacity: .8; }
+        .hastatus { font-size: .9em; font-weight: 500; white-space: nowrap; }
         .autotoggle.on .knob { left: 31px; background: ${pal.chipActiveFg}; color: ${pal.chipActiveBg}; }
       </style>
       <ha-card>
@@ -699,7 +717,7 @@
           <div class="head">
             <button class="mainpower" title="${isOn ? "Turn off" : "Turn on"}">${svgIcon(ICONS.power)}</button>
             <span class="title">${esc(title)}</span>
-            <span class="bigtemp" title="AC target temperature">${fmt(acSetpoint, 0)}<span class="unit">&deg;C</span></span>
+            ${autoHead || `<span class="bigtemp" title="AC target temperature">${fmt(acSetpoint, 0)}<span class="unit">&deg;C</span></span>`}
           </div>
           <div class="body">
             <div class="zones">${zoneRows || `<div class="zone missing">No zones configured</div>`}</div>
@@ -1103,6 +1121,19 @@ class AirTouchThemePicker extends HTMLElement {
         },
         { name: "auto_name", label: "Toggle label (optional)", selector: { text: {} } },
         {
+          name: "auto_position",
+          label: "Toggle position",
+          selector: {
+            select: {
+              mode: "dropdown",
+              options: [
+                { value: "controls", label: "Controls column" },
+                { value: "header", label: "Header (replaces the AC setpoint)" },
+              ],
+            },
+          },
+        },
+        {
           name: "auto_status_entity",
           label: "Automation status entity (optional, e.g. input_select)",
           selector: { entity: {} },
@@ -1117,6 +1148,7 @@ class AirTouchThemePicker extends HTMLElement {
         show_watermark: this._config.show_watermark ?? true,
         auto_entity: this._config.auto_entity || "",
         auto_name: this._config.auto_name || "",
+        auto_position: this._config.auto_position || "controls",
         auto_status_entity: this._config.auto_status_entity || "",
       };
       mainForm.computeLabel = (s) => s.label || s.name;
@@ -1128,6 +1160,7 @@ class AirTouchThemePicker extends HTMLElement {
         const styleChanged = v.style !== (this._config.style || "bold");
         this._config = { ...this._config, ...v };
         if (!this._config.name) delete this._config.name;
+        if (this._config.auto_position === "controls") delete this._config.auto_position;
         for (const k of ["auto_entity", "auto_name", "auto_status_entity"]) {
           if (!this._config[k]) delete this._config[k];
         }

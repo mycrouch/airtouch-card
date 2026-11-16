@@ -87,6 +87,7 @@ zones:                           # auto-discovered; override to reorder/rename
 | `show_watermark` | `true` | Faint mode-icon watermark behind the gradient |
 | `auto_entity` | — | `input_boolean`, `switch` or `automation` shown as a toggle (e.g. an auto-dry automation enable) |
 | `auto_name` | entity name | Label for the toggle |
+| `auto_position` | `controls` | `controls` (under Mode/Fan) or `header` (replaces the AC setpoint in the header) |
 | `auto_icon` | `dry` | Icon key for the toggle knob (any mode icon: `cool`, `dry`, `auto`, …) |
 | `auto_status_entity` | — | Entity whose state is shown next to the label while the toggle is on |
 | `auto_status_map` | — | Map of status states to display text |
